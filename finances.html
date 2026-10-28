@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Belém – Finances</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: owner's ledger — summary strip, budget-by-lot table, reference estimate by item, then the ledger of movements; one column, wide tables scroll. */
+:root{
+  --bg:#f4f2f7; --surface:#ffffff; --sunk:#ebe7f1; --line:#d9d3e3; --fg:#1f1b26; --muted:#665f72;
+  --accent:#5a3f91; --accent-ink:#ffffff; --ok:#2e7d4f; --bad:#b3261e; --warn:#b26a00;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --f-body:"Barlow",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#17141c;--surface:#201c27;--sunk:#2a2533;--line:#3a3445;--fg:#ece8f2;--muted:#a59db1;--accent:#b9a0e6;--accent-ink:#1a1323;--ok:#6cc58f;--bad:#f08178;--warn:#e7a74a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17141c;--surface:#201c27;--sunk:#2a2533;--line:#3a3445;--fg:#ece8f2;--muted:#a59db1;--accent:#b9a0e6;--accent-ink:#1a1323;--ok:#6cc58f;--bad:#f08178;--warn:#e7a74a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+#app{display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+header .eyebrow{font-family:var(--f-mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+h1{font-family:var(--f-display);font-size:40px;line-height:1;margin:4px 0 0}
+header p{margin:6px 0 0;color:var(--muted);max-width:70ch}
+h2{font-family:var(--f-display);font-size:22px;margin:0}
+.hact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:5px 11px;cursor:pointer;font-size:13px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.kpi .v{font-family:var(--f-display);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.bad .v{color:var(--bad)} .kpi.ok .v{color:var(--ok)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0}
+.panel>.ph{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+.panel .body{padding:12px 16px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.tot td{font-weight:600;background:var(--sunk)}
+.neg{color:var(--bad)}
+.lot{font-family:var(--f-mono);font-size:12px;background:var(--sunk);border-radius:4px;padding:1px 5px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{padding:3px 9px;font-size:13px}
+.btn.bad{color:var(--bad);border-color:var(--bad)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input.cell{width:120px;text-align:right;border:1px solid var(--line);border-radius:4px;padding:3px 6px;background:var(--bg);font-size:16px}
+.notice{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--surface);border-radius:6px;padding:12px 14px;font-size:14px}
+.notice.bad{border-left-color:var(--bad)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.f input,.f select{border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--bg);width:100%;font-size:16px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:10px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters select{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--surface);font-size:16px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:6px;font-weight:600;z-index:20}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+details.lotd{border-bottom:1px solid var(--line)}
+details.lotd:last-child{border-bottom:0}
+details.lotd summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 16px;cursor:pointer;list-style:none}
+details.lotd summary::-webkit-details-marker{display:none}
+details.lotd summary::before{content:"▸";color:var(--muted);grid-column:auto}
+details.lotd[open] summary::before{content:"▾"}
+details.lotd summary{grid-template-columns:12px auto minmax(0,1fr) auto}
+details.lotd summary b{font-variant-numeric:tabular-nums}
+.sub2{font-size:12px;color:var(--muted)}
+@media (max-width:760px){.grid2{grid-template-columns:1fr} h1{font-size:32px}}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>window.SHIM_MODE="fin"</script>
+<script src="shim.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><div class="eyebrow">MAISON BELÉM · COTEME · <span id="h-priv">PRIVÉ</span></div><h1 id="h-title">Finances du chantier</h1>
+    <p id="h-sub"></p></div>
+    <div class="hact"><a class="btn" href="index.html">← Chantier / Obra</a><span id="hdr-actions"></span><div class="seg" role="group" aria-label="Langue / Língua"><button type="button" id="lang-fr">FR</button><button type="button" id="lang-pt">PT</button></div></div>
+  </header>
+  <div id="app"><div class="notice">…</div></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const T = {
+ fr:{priv:'PRIVÉ',title:'Finances du chantier',sub:'Budget par lot, estimation de référence détaillée, engagements, situations, paiements, retenues et pénalités. Page réservée au maître d\'ouvrage : ne la partagez avec personne.',
+  loading:'Chargement…',noDb:'Cette page ne s\'ouvre qu\'avec votre compte. Rechargez-la.',notOwner:'Page réservée au maître d\'ouvrage.',loadErr:'Chargement impossible. Rechargez la page.',
+  csv:'Exporter en CSV',purchase:'Prix d\'achat',purchaseS:'permis compris',budget:'Budget travaux HT',budgetS:'base + options retenues',engaged:'Engagé HT',ofBudget:'% du budget',situe:'Situé (validé) HT',restEng:'reste engagé',paid:'Payé TTC',toPay:'Reste à payer TTC',toPayS:'sur situations validées',rg:'Retenues détenues',rgS:'des situations',total:'Coût total prévu TTC',totalS:'achat + budget × (1 + TVA',
+  byLot:'Budget par lot',byLotHint:'Budget = estimation de référence de Claude (28/10/2026). Modifiez un budget directement dans la case.',lot:'Lot',desig:'Désignation',budgetHT:'Budget HT',engHT:'Engagé HT',gap:'Écart',situeHT:'Situé HT',paidTTC:'Payé TTC',retained:'retenue',totIn:'Total (base + options retenues)',opt:'option',
+  refTitle:'Estimation de référence (Claude) — détail des prix',refHint:'Prix unitaires HT estimés par Claude pour ce projet, poste par poste. Les postes « pose seule » excluent la fourniture (cuisine, pierre, carrelage, sols, sanitaires fournis par vous).',refBase:'Total base HT',refOpt:'Total options HT',refAll:'Base + options HT',resetBudget:'Reprendre comme budget',ref:'Réf.',unit:'Un.',qty:'Qté',pu:'P.U. HT',tot:'Total HT',postes:'postes',
+  newMv:'Nouveau mouvement',editMv:'Modifier le mouvement',date:'Date',type:'Type',company:'Entreprise',refDoc:'Référence (BC, TS, facture)',ht:'Montant HT',ttc:'Montant TTC (paiements)',note:'Note',cancel:'Annuler',save:'Enregistrer',add:'Ajouter',needAmt:'Indiquez un montant HT ou TTC',
+  pen:'Pénalités de retard',penBase:'Montant du marché HT',penDays:'Jours de retard',penRate:'Taux par jour (‰)',penCap:'Plafond (%)',penOut:'Pénalité',penCapHit:'(plafond atteint)',penCapL:'plafond',penHint:'Les jours de retard sont ceux de la fin prévisionnelle par rapport à la fin contractuelle révisée (page chantier, onglet Planning). Enregistrez la pénalité comme mouvement « Pénalité appliquée » une fois notifiée.',
+  mv:'Mouvements',allLots:'Tous les lots',allTypes:'Tous les types',filterLot:'Filtrer par lot',filterType:'Filtrer par type',coRef:'Entreprise / réf.',edit:'Modifier',del:'Supprimer',confirm:'Confirmer',noMv:'Aucun mouvement. Ajoutez vos bons de commande comme « Engagement », chaque situation validée, puis chaque paiement.',
+  settings:'Paramètres et notes',vat:'TVA (%)',ret:'Retenue (%)',pr:'Pénalité (‰/jour)',pc:'Plafond pénalités (%)',notes:'Notes',
+  saved:'Enregistré',refused:'Enregistrement refusé',deleted:'Supprimé',delRefused:'Suppression refusée',budgetSaved:'Budget mis à jour',exportCancel:'Export annulé',
+  ty_engagement:'Engagement (BC / TS validé)',ty_situation:'Situation validée (HT du mois)',ty_paiement:'Paiement (TTC)',ty_avance:'Avance versée',ty_remb_avance:'Remboursement d\'avance',ty_liberation_rg:'Libération de retenue',ty_penalite:'Pénalité appliquée',ty_autre:'Autre dépense'},
+ pt:{priv:'PRIVADO',title:'Finanças da obra',sub:'Orçamento por lote, estimativa de referência detalhada, adjudicações, autos, pagamentos, retenções e multas. Página reservada ao dono de obra: não a partilhe com ninguém.',
+  loading:'A carregar…',noDb:'Esta página só abre com a sua conta. Recarregue-a.',notOwner:'Página reservada ao dono de obra.',loadErr:'Não foi possível carregar. Recarregue a página.',
+  csv:'Exportar em CSV',purchase:'Preço de compra',purchaseS:'com licença',budget:'Orçamento obra s/ IVA',budgetS:'base + opções escolhidas',engaged:'Adjudicado s/ IVA',ofBudget:'% do orçamento',situe:'Medido (validado) s/ IVA',restEng:'falta medir',paid:'Pago c/ IVA',toPay:'Falta pagar c/ IVA',toPayS:'sobre autos validados',rg:'Retenções em poder',rgS:'dos autos',total:'Custo total previsto c/ IVA',totalS:'compra + orçamento × (1 + IVA',
+  byLot:'Orçamento por lote',byLotHint:'Orçamento = estimativa de referência do Claude (28/10/2026). Altere um valor diretamente na célula.',lot:'Lote',desig:'Designação',budgetHT:'Orçamento s/ IVA',engHT:'Adjudicado s/ IVA',gap:'Diferença',situeHT:'Medido s/ IVA',paidTTC:'Pago c/ IVA',retained:'escolhida',totIn:'Total (base + opções escolhidas)',opt:'opção',
+  refTitle:'Estimativa de referência (Claude) — detalhe dos preços',refHint:'Preços unitários s/ IVA estimados pelo Claude para este projeto, artigo a artigo. Os artigos « só assentamento » excluem o fornecimento (cozinha, pedra, cerâmicos, pavimentos, louças fornecidos por si).',refBase:'Total base s/ IVA',refOpt:'Total opções s/ IVA',refAll:'Base + opções s/ IVA',resetBudget:'Usar como orçamento',ref:'Art.',unit:'Un.',qty:'Qtd.',pu:'P.U. s/ IVA',tot:'Total s/ IVA',postes:'artigos',
+  newMv:'Novo movimento',editMv:'Editar movimento',date:'Data',type:'Tipo',company:'Empresa',refDoc:'Referência (NE, TM, fatura)',ht:'Valor s/ IVA',ttc:'Valor c/ IVA (pagamentos)',note:'Nota',cancel:'Cancelar',save:'Guardar',add:'Adicionar',needAmt:'Indique um valor s/ IVA ou c/ IVA',
+  pen:'Multas por atraso',penBase:'Valor do contrato s/ IVA',penDays:'Dias de atraso',penRate:'Taxa diária (‰)',penCap:'Limite (%)',penOut:'Multa',penCapHit:'(limite atingido)',penCapL:'limite',penHint:'Os dias de atraso são os do fim previsto face ao fim contratual revisto (página da obra, separador Planeamento). Registe a multa como movimento « Multa aplicada » depois de notificada.',
+  mv:'Movimentos',allLots:'Todos os lotes',allTypes:'Todos os tipos',filterLot:'Filtrar por lote',filterType:'Filtrar por tipo',coRef:'Empresa / ref.',edit:'Editar',del:'Apagar',confirm:'Confirmar',noMv:'Nenhum movimento. Registe as notas de encomenda como « Adjudicação », cada auto validado e depois cada pagamento.',
+  settings:'Parâmetros e notas',vat:'IVA (%)',ret:'Retenção (%)',pr:'Multa (‰/dia)',pc:'Limite das multas (%)',notes:'Notas',
+  saved:'Guardado',refused:'Gravação recusada',deleted:'Apagado',delRefused:'Eliminação recusada',budgetSaved:'Orçamento atualizado',exportCancel:'Exportação cancelada',
+  ty_engagement:'Adjudicação (NE / TM aprovado)',ty_situation:'Auto validado (valor do mês s/ IVA)',ty_paiement:'Pagamento (c/ IVA)',ty_avance:'Adiantamento pago',ty_remb_avance:'Reembolso de adiantamento',ty_liberation_rg:'Libertação de retenção',ty_penalite:'Multa aplicada',ty_autre:'Outra despesa'}
+};
+let lang = 'fr';
+try { const l = localStorage.getItem('belem.lang'); if (l === 'pt' || l === 'fr') lang = l; } catch (e) {}
+const t = k => T[lang][k] ?? T.fr[k] ?? k;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const loc = () => lang === 'pt' ? 'pt-PT' : 'fr-FR';
+const money = v => (v == null || v === '' || isNaN(v)) ? '—' : new Intl.NumberFormat(loc(), {style:'currency', currency:'EUR', minimumFractionDigits:2, maximumFractionDigits:2}).format(+v);
+const qty = v => new Intl.NumberFormat(loc(), {minimumFractionDigits:0, maximumFractionDigits:2}).format(+v || 0);
+const pad = n => String(n).padStart(2, '0');
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString(loc(), {day:'2-digit', month:'short', year:'numeric'}) : '—';
+const sum = (a, f) => a.reduce((s, x) => s + (+f(x) || 0), 0);
+const r2 = x => Math.round(x * 100) / 100;
+function toast(m){ const e = document.createElement('div'); e.className = 'toast'; e.setAttribute('role', 'status'); e.textContent = m; document.body.appendChild(e); setTimeout(() => e.remove(), 2400); }
+const TYPE_KEYS = ['engagement','situation','paiement','avance','remb_avance','liberation_rg','penalite','autre'];
+const S = { settings:{}, lots:[], entries:[], ref:[] };
+const UI = { lot:'', type:'', confirm:null, editing:null, open:{} };
+let db = null, downloads = null, isOwner = false, ready = false;
+const lotLabel = l => (lang === 'pt' ? (l.labelPt || l.label) : (l.labelFr || l.label)) || '';
+const refTotal = r => sum(r.items || [], i => (+i.q || 0) * (+i.pu || 0));
+
+function lotAgg(code){
+  const e = S.entries.filter(x => x.lot === code);
+  const by = ty => sum(e.filter(x => x.type === ty), x => x.amountHT);
+  return { engaged:by('engagement'), situe:by('situation'), paid:sum(e.filter(x => x.type === 'paiement'), x => x.amountTTC) };
+}
+function totals(){
+  const ret = +(S.settings.retentionPct ?? 5) / 100, vat = +(S.settings.vatRate ?? 6) / 100;
+  const by = ty => sum(S.entries.filter(x => x.type === ty), x => x.amountHT);
+  const budget = sum(S.lots.filter(l => !l.option || l.retained), l => l.budget);
+  const engaged = by('engagement'), situe = by('situation');
+  const paid = sum(S.entries.filter(x => x.type === 'paiement'), x => x.amountTTC);
+  const rgHeld = situe * ret - by('liberation_rg');
+  const pen = by('penalite');
+  const dueTTC = situe * (1 + vat) - situe * ret - pen - by('remb_avance') + by('avance') * (1 + vat) + by('liberation_rg');
+  return {budget, engaged, situe, paid, rgHeld, toPay:r2(dueTTC - paid), restEngaged:engaged - situe, vat};
+}
+let raf = 0, pend = false;
+function render(){ const ae = document.activeElement; if (ae && $('#app').contains(ae) && ae.form && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) { pend = true; return; } if (raf) return; raf = requestAnimationFrame(() => { raf = 0; draw(); }); }
+document.addEventListener('focusout', () => { if (pend) setTimeout(() => { const ae = document.activeElement; if (pend && !(ae && ae.form)) { pend = false; render(); } }, 0); });
+function drawHead(){
+  document.documentElement.lang = lang;
+  $('#h-priv').textContent = t('priv'); $('#h-title').textContent = t('title'); $('#h-sub').textContent = t('sub');
+  $('#lang-fr').setAttribute('aria-pressed', String(lang === 'fr')); $('#lang-pt').setAttribute('aria-pressed', String(lang === 'pt'));
+  $('#hdr-actions').innerHTML = downloads && isOwner ? `<button class="btn" data-act="csv">${esc(t('csv'))}</button>` : '';
+}
+function draw(){
+  drawHead();
+  const app = $('#app');
+  if (!ready) { app.innerHTML = `<div class="notice">${esc(t('loading'))}</div>`; return; }
+  if (!db) { app.innerHTML = `<div class="notice bad">${esc(t('noDb'))}</div>`; return; }
+  if (!isOwner) { app.innerHTML = `<div class="notice bad">${esc(t('notOwner'))}</div>`; return; }
+  const T2 = totals(), s = S.settings;
+  const all = s.purchase ? +s.purchase + T2.budget * (1 + T2.vat) : null;
+  let h = `<div class="kpis">
+    <div class="kpi"><span class="l">${esc(t('purchase'))}</span><span class="v">${money(s.purchase)}</span><span class="s">${esc(t('purchaseS'))}</span></div>
+    <div class="kpi"><span class="l">${esc(t('budget'))}</span><span class="v">${money(T2.budget)}</span><span class="s">${esc(t('budgetS'))}</span></div>
+    <div class="kpi"><span class="l">${esc(t('engaged'))}</span><span class="v">${money(T2.engaged)}</span><span class="s">${T2.budget ? Math.round(T2.engaged / T2.budget * 100) + ' ' + esc(t('ofBudget')) : ''}</span></div>
+    <div class="kpi"><span class="l">${esc(t('situe'))}</span><span class="v">${money(T2.situe)}</span><span class="s">${esc(t('restEng'))} ${money(T2.restEngaged)}</span></div>
+    <div class="kpi"><span class="l">${esc(t('paid'))}</span><span class="v">${money(T2.paid)}</span></div>
+    <div class="kpi ${T2.toPay > 0.5 ? 'bad' : 'ok'}"><span class="l">${esc(t('toPay'))}</span><span class="v">${money(T2.toPay)}</span><span class="s">${esc(t('toPayS'))}</span></div>
+    <div class="kpi"><span class="l">${esc(t('rg'))}</span><span class="v">${money(T2.rgHeld)}</span><span class="s">${esc(s.retentionPct ?? 5)} % ${esc(t('rgS'))}</span></div>
+    <div class="kpi"><span class="l">${esc(t('total'))}</span><span class="v">${all ? money(all) : '—'}</span><span class="s">${esc(t('totalS'))} ${esc(s.vatRate ?? 6)} %)</span></div>
+  </div>`;
+  const lots = [...S.lots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const rows = lots.map(l => {
+    const a = lotAgg(l.code), ecart = (+l.budget || 0) - a.engaged;
+    return `<tr><td><span class="lot">${esc(l.code)}</span>${l.option ? ` <span class="sub2">${esc(t('opt'))}</span>` : ''}</td><td>${esc(lotLabel(l))}${l.option ? ` <label class="small muted"><input type="checkbox" data-retain="${esc(l.id)}" id="ret-${esc(l.id)}" ${l.retained ? 'checked' : ''}> ${esc(t('retained'))}</label>` : ''}</td>
+      <td class="n"><input class="cell" type="number" step="any" inputmode="decimal" value="${l.budget ?? ''}" data-budget="${esc(l.id)}" id="bud-${esc(l.id)}" aria-label="${esc(t('budgetHT'))} ${esc(l.code)}"></td>
+      <td class="n">${money(a.engaged)}</td><td class="n ${ecart < 0 ? 'neg' : ''}">${a.engaged ? money(ecart) : '—'}</td><td class="n">${money(a.situe)}</td><td class="n">${money(a.paid)}</td></tr>`;
+  }).join('');
+  const tot = `<tr class="tot"><td></td><td>${esc(t('totIn'))}</td><td class="n">${money(T2.budget)}</td><td class="n">${money(T2.engaged)}</td><td class="n">${money(T2.budget - T2.engaged)}</td><td class="n">${money(T2.situe)}</td><td class="n">${money(T2.paid)}</td></tr>`;
+  h += `<section class="panel"><div class="ph"><h2>${esc(t('byLot'))}</h2><span class="small muted">${esc(t('byLotHint'))}</span></div><div class="tw"><table><thead><tr><th>${esc(t('lot'))}</th><th>${esc(t('desig'))}</th><th class="n">${esc(t('budgetHT'))}</th><th class="n">${esc(t('engHT'))}</th><th class="n">${esc(t('gap'))}</th><th class="n">${esc(t('situeHT'))}</th><th class="n">${esc(t('paidTTC'))}</th></tr></thead><tbody>${rows}${tot}</tbody></table></div></section>`;
+  // reference estimate
+  const refs = [...S.ref].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const rb = sum(refs.filter(r => !r.option), refTotal), ro = sum(refs.filter(r => r.option), refTotal);
+  h += `<section class="panel"><div class="ph"><h2>${esc(t('refTitle'))}</h2><div class="small"><span class="muted">${esc(t('refBase'))}</span> <b>${money(rb)}</b> · <span class="muted">${esc(t('refOpt'))}</span> <b>${money(ro)}</b> · <span class="muted">${esc(t('refAll'))}</span> <b>${money(rb + ro)}</b></div></div>
+    <div class="body small muted">${esc(t('refHint'))}</div>
+    ${refs.map(r => {
+      const lot = S.lots.find(l => l.code === r.code);
+      const items = (r.items || []).map(i => `<tr><td><span class="lot">${esc(i.ref)}</span></td><td>${esc(lang === 'pt' ? i.pt : i.fr)}<div class="sub2">${esc(lang === 'pt' ? i.fr : i.pt)}</div>${i.note ? `<div class="sub2">${esc(i.note)}</div>` : ''}</td><td>${esc(i.unit)}</td><td class="n">${qty(i.q)}</td><td class="n">${money(i.pu)}</td><td class="n">${money((+i.q || 0) * (+i.pu || 0))}</td></tr>`).join('');
+      return `<details class="lotd" data-lotd="${esc(r.code)}" ${UI.open[r.code] ? 'open' : ''}><summary><span class="lot">${esc(r.code)}</span><span>${esc(lang === 'pt' ? r.pt : r.fr)} <span class="sub2">· ${(r.items || []).length} ${esc(t('postes'))}</span></span><b>${money(refTotal(r))}</b></summary>
+        <div class="tw"><table><thead><tr><th>${esc(t('ref'))}</th><th>${esc(t('desig'))}</th><th>${esc(t('unit'))}</th><th class="n">${esc(t('qty'))}</th><th class="n">${esc(t('pu'))}</th><th class="n">${esc(t('tot'))}</th></tr></thead><tbody>${items}</tbody></table></div>
+        ${lot && Math.abs((+lot.budget || 0) - refTotal(r)) > 0.5 ? `<div class="body"><button class="btn sm" data-act="resetBudget" data-id="${esc(lot.id)}" data-v="${r2(refTotal(r))}">${esc(t('resetBudget'))} (${money(refTotal(r))})</button></div>` : ''}
+      </details>`;
+    }).join('')}
+  </section>`;
+  // entry + penalties
+  const lotOpts = lots.map(l => `<option value="${esc(l.code)}">${esc(l.code)} — ${esc(lotLabel(l))}</option>`).join('');
+  const ed = UI.editing ? S.entries.find(x => x.id === UI.editing) : null;
+  h += `<div class="grid2"><section class="panel"><div class="ph"><h2>${esc(ed ? t('editMv') : t('newMv'))}</h2></div><div class="body"><form id="entry" class="form" novalidate>
+    <div class="f"><label for="e-date">${esc(t('date'))}</label><input id="e-date" name="date" type="date" value="${esc(ed?.date || today())}"></div>
+    <div class="f"><label for="e-type">${esc(t('type'))}</label><select id="e-type" name="type">${TYPE_KEYS.map(k => `<option value="${k}" ${ed?.type === k ? 'selected' : ''}>${esc(t('ty_' + k))}</option>`).join('')}</select></div>
+    <div class="f"><label for="e-lot">${esc(t('lot'))}</label><select id="e-lot" name="lot"><option value="">—</option>${lotOpts}</select></div>
+    <div class="f"><label for="e-co">${esc(t('company'))}</label><input id="e-co" name="company" value="${esc(ed?.company || '')}"></div>
+    <div class="f"><label for="e-ref">${esc(t('refDoc'))}</label><input id="e-ref" name="ref" value="${esc(ed?.ref || '')}"></div>
+    <div class="f"><label for="e-ht">${esc(t('ht'))}</label><input id="e-ht" name="amountHT" type="number" step="any" inputmode="decimal" value="${ed?.amountHT ?? ''}"></div>
+    <div class="f"><label for="e-ttc">${esc(t('ttc'))}</label><input id="e-ttc" name="amountTTC" type="number" step="any" inputmode="decimal" value="${ed?.amountTTC ?? ''}"></div>
+    <div class="f" style="grid-column:1/-1"><label for="e-note">${esc(t('note'))}</label><input id="e-note" name="note" value="${esc(ed?.note || '')}"></div>
+    <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">${ed ? `<button type="button" class="btn" data-act="cancelEdit">${esc(t('cancel'))}</button>` : ''}<button class="btn primary" type="submit">${esc(ed ? t('save') : t('add'))}</button></div>
+  </form></div></section>
+  <section class="panel"><div class="ph"><h2>${esc(t('pen'))}</h2></div><div class="body"><form id="pen" class="form" novalidate>
+    <div class="f"><label for="p-base">${esc(t('penBase'))}</label><input id="p-base" type="number" step="any" inputmode="decimal" value="${T2.engaged ? r2(T2.engaged) : ''}"></div>
+    <div class="f"><label for="p-days">${esc(t('penDays'))}</label><input id="p-days" type="number" value="0"></div>
+    <div class="f"><label for="p-rate">${esc(t('penRate'))}</label><input id="p-rate" type="number" step="any" value="${esc(s.penaltyRate ?? 1)}"></div>
+    <div class="f"><label for="p-cap">${esc(t('penCap'))}</label><input id="p-cap" type="number" step="any" value="${esc(s.penaltyCap ?? 10)}"></div>
+  </form><p id="p-out" class="small" style="margin:10px 0 0"></p><p class="small muted" style="margin:6px 0 0">${esc(t('penHint'))}</p></div></section></div>`;
+  const list = S.entries.filter(x => (!UI.lot || x.lot === UI.lot) && (!UI.type || x.type === UI.type)).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const lrows = list.map(x => `<tr><td>${fmtDate(x.date)}</td><td><span class="pill">${esc(t('ty_' + x.type))}</span></td><td>${x.lot ? `<span class="lot">${esc(x.lot)}</span>` : '—'}</td><td>${esc(x.company || '')}<div class="small muted">${esc(x.ref || '')}${x.note ? ' · ' + esc(x.note) : ''}</div></td><td class="n">${money(x.amountHT)}</td><td class="n">${money(x.amountTTC)}</td><td><div style="display:flex;gap:6px"><button class="btn sm" data-act="edit" data-id="${esc(x.id)}">${esc(t('edit'))}</button>${UI.confirm === x.id ? `<button class="btn sm bad" data-act="del" data-id="${esc(x.id)}">${esc(t('confirm'))}</button>` : `<button class="btn sm" data-act="ask" data-id="${esc(x.id)}">${esc(t('del'))}</button>`}</div></td></tr>`).join('');
+  h += `<section class="panel"><div class="ph"><h2>${esc(t('mv'))}</h2><div class="filters"><select id="fl" aria-label="${esc(t('filterLot'))}"><option value="">${esc(t('allLots'))}</option>${lots.map(l => `<option value="${esc(l.code)}" ${UI.lot === l.code ? 'selected' : ''}>${esc(l.code)}</option>`).join('')}</select><select id="ft" aria-label="${esc(t('filterType'))}"><option value="">${esc(t('allTypes'))}</option>${TYPE_KEYS.map(k => `<option value="${k}" ${UI.type === k ? 'selected' : ''}>${esc(t('ty_' + k))}</option>`).join('')}</select></div></div>
+    <div class="tw">${list.length ? `<table><thead><tr><th>${esc(t('date'))}</th><th>${esc(t('type'))}</th><th>${esc(t('lot'))}</th><th>${esc(t('coRef'))}</th><th class="n">HT</th><th class="n">TTC</th><th></th></tr></thead><tbody>${lrows}</tbody></table>` : `<p class="muted" style="padding:16px">${esc(t('noMv'))}</p>`}</div></section>`;
+  h += `<section class="panel"><div class="ph"><h2>${esc(t('settings'))}</h2></div><div class="body"><form id="set" class="form" novalidate>
+    <div class="f"><label for="s-pur">${esc(t('purchase'))}</label><input id="s-pur" name="purchase" type="number" step="any" value="${s.purchase ?? ''}"></div>
+    <div class="f"><label for="s-vat">${esc(t('vat'))}</label><input id="s-vat" name="vatRate" type="number" step="any" value="${s.vatRate ?? 6}"></div>
+    <div class="f"><label for="s-ret">${esc(t('ret'))}</label><input id="s-ret" name="retentionPct" type="number" step="any" value="${s.retentionPct ?? 5}"></div>
+    <div class="f"><label for="s-pr">${esc(t('pr'))}</label><input id="s-pr" name="penaltyRate" type="number" step="any" value="${s.penaltyRate ?? 1}"></div>
+    <div class="f"><label for="s-pc">${esc(t('pc'))}</label><input id="s-pc" name="penaltyCap" type="number" step="any" value="${s.penaltyCap ?? 10}"></div>
+    <div class="f" style="grid-column:1/-1"><label for="s-notes">${esc(t('notes'))}</label><input id="s-notes" name="notes" value="${esc(s.notes || '')}"></div>
+    <div style="grid-column:1/-1;display:flex;justify-content:flex-end"><button class="btn primary" type="submit">${esc(t('save'))}</button></div>
+  </form></div></section>`;
+  app.innerHTML = h;
+  if (ed) $('#e-lot').value = ed.lot || '';
+  bind(); penCalc();
+}
+function penCalc(){
+  const b = +$('#p-base')?.value || 0, d = +$('#p-days')?.value || 0, r = +$('#p-rate')?.value || 0, c = +$('#p-cap')?.value || 0;
+  const raw = b * d * r / 1000, cap = b * c / 100, v = Math.min(raw, cap);
+  const o = $('#p-out'); if (o) o.innerHTML = `${esc(t('penOut'))} : <b>${money(v)}</b>${raw > cap ? ' ' + esc(t('penCapHit')) : ''} — ${d} × ${r} ‰ × ${money(b)}, ${esc(t('penCapL'))} ${money(cap)}.`;
+}
+const num = v => v === '' || v == null ? null : +String(v).replace(',', '.');
+function bind(){
+  $('#entry').addEventListener('submit', async e => {
+    e.preventDefault(); const f = e.target.elements;
+    const data = {date:f.date.value, type:f.type.value, lot:f.lot.value, company:f.company.value.trim(), ref:f.ref.value.trim(), amountHT:num(f.amountHT.value), amountTTC:num(f.amountTTC.value), note:f.note.value.trim(), updatedAt:new Date().toISOString()};
+    if (data.amountHT == null && data.amountTTC == null) { toast(t('needAmt')); return; }
+    if (data.type === 'paiement' && data.amountTTC == null) data.amountTTC = data.amountHT;
+    try {
+      if (UI.editing) await db.collection('entries').doc(UI.editing).update(data);
+      else await db.collection('entries').add({...data, createdAt:new Date().toISOString()});
+      UI.editing = null; document.activeElement?.blur(); pend = false; toast(t('saved')); render();
+    } catch (x) { toast(t('refused')); }
+  });
+  $('#set').addEventListener('submit', async e => {
+    e.preventDefault(); const f = e.target.elements;
+    try { await db.doc('settings/main').set({...S.settings, purchase:num(f.purchase.value), vatRate:num(f.vatRate.value), retentionPct:num(f.retentionPct.value), penaltyRate:num(f.penaltyRate.value), penaltyCap:num(f.penaltyCap.value), notes:f.notes.value.trim(), updatedAt:new Date().toISOString()}); document.activeElement?.blur(); pend = false; toast(t('saved')); render(); } catch (x) { toast(t('refused')); }
+  });
+  ['p-base','p-days','p-rate','p-cap'].forEach(id => $('#' + id).addEventListener('input', penCalc));
+  document.querySelectorAll('[data-budget]').forEach(el => el.addEventListener('change', async () => { try { await db.collection('lots').doc(el.dataset.budget).update({budget:num(el.value)}); toast(t('budgetSaved')); } catch (x) { toast(t('refused')); } }));
+  document.querySelectorAll('[data-retain]').forEach(el => el.addEventListener('change', async () => { try { await db.collection('lots').doc(el.dataset.retain).update({retained:el.checked}); } catch (x) { toast(t('refused')); } }));
+  document.querySelectorAll('details[data-lotd]').forEach(el => el.addEventListener('toggle', () => { UI.open[el.dataset.lotd] = el.open; }));
+  $('#fl').addEventListener('change', e => { UI.lot = e.target.value; e.target.blur(); pend = false; render(); });
+  $('#ft').addEventListener('change', e => { UI.type = e.target.value; e.target.blur(); pend = false; render(); });
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = b.dataset.id;
+  if (b.dataset.act === 'edit') { UI.editing = id; render(); setTimeout(() => $('#e-date')?.focus(), 50); }
+  if (b.dataset.act === 'cancelEdit') { UI.editing = null; render(); }
+  if (b.dataset.act === 'ask') { UI.confirm = id; render(); setTimeout(() => { if (UI.confirm === id) { UI.confirm = null; render(); } }, 4000); }
+  if (b.dataset.act === 'del') { UI.confirm = null; try { await db.collection('entries').doc(id).delete(); toast(t('deleted')); } catch (x) { toast(t('delRefused')); } }
+  if (b.dataset.act === 'resetBudget') { try { await db.collection('lots').doc(id).update({budget:+b.dataset.v}); toast(t('budgetSaved')); } catch (x) { toast(t('refused')); } }
+  if (b.dataset.act === 'csv') {
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const H = lang === 'pt' ? ['data','tipo','lote','empresa','referencia','valor_sem_IVA','valor_com_IVA','nota'] : ['date','type','lot','entreprise','reference','montant_HT','montant_TTC','note'];
+    const lines = [H.join(';'), ...[...S.entries].sort((a, c) => (a.date || '').localeCompare(c.date || '')).map(x => [x.date, t('ty_' + x.type), x.lot, x.company, x.ref, x.amountHT ?? '', x.amountTTC ?? '', x.note].map(q).join(';'))];
+    const L = [(lang === 'pt' ? 'lote;designacao;orcamento;adjudicado;medido;pago' : 'lot;designation;budget_HT;engage_HT;situe_HT;paye_TTC'), ...[...S.lots].sort((a, c) => (a.order ?? 0) - (c.order ?? 0)).map(l => { const a = lotAgg(l.code); return [l.code, lotLabel(l), l.budget ?? '', a.engaged, a.situe, a.paid].map(q).join(';'); })];
+    const R = [(lang === 'pt' ? 'artigo;designacao_PT;designacao_FR;unidade;quantidade;preco_unitario;total' : 'poste;designation_PT;designation_FR;unite;quantite;prix_unitaire_HT;total_HT'), ...[...S.ref].sort((a, c) => (a.order ?? 0) - (c.order ?? 0)).flatMap(r => (r.items || []).map(i => [i.ref, i.pt, i.fr, i.unit, i.q, i.pu, r2((+i.q || 0) * (+i.pu || 0))].map(q).join(';')))];
+    try { await downloads.save({filename:(lang === 'pt' ? 'belem-financas-' : 'belem-finances-') + today() + '.csv', data:'﻿' + lines.join('\n') + '\n\n' + L.join('\n') + '\n\n' + R.join('\n')}); } catch (x) { toast(t('exportCancel')); }
+  }
+});
+['fr','pt'].forEach(l => $('#lang-' + l).addEventListener('click', () => { lang = l; try { localStorage.setItem('belem.lang', l); } catch (e) {} pend = false; render(); }));
+async function boot(){
+  draw();
+  try {
+    const c = window.claude; if (!c?.use) { ready = true; draw(); return; }
+    const [u, d] = await Promise.all([c.use('user'), c.use('db')]);
+    db = d; isOwner = u ? await u.isOwner() : false; ready = true;
+    c.use('downloads').then(x => { downloads = x; render(); }).catch(() => {});
+    if (!db || !isOwner) { draw(); return; }
+    db.doc('settings/main').onSnapshot(s => { S.settings = s.exists ? s.data() : {}; render(); }, e => console.warn(e));
+    db.collection('lots').onSnapshot(s => { S.lots = s.docs.map(x => ({id:x.id, ...x.data()})); render(); }, e => console.warn(e));
+    db.collection('entries').onSnapshot(s => { S.entries = s.docs.map(x => ({id:x.id, ...x.data()})); render(); }, e => console.warn(e));
+    db.collection('ref').onSnapshot(s => { S.ref = s.docs.map(x => ({id:x.id, ...x.data()})); render(); }, e => console.warn(e));
+    draw();
+  } catch (e) { console.error(e); ready = true; $('#app').innerHTML = `<div class="notice bad">${esc(t('loadErr'))}</div>`; }
+}
+boot();
+})();
+</script>
+
+</body>
+</html>

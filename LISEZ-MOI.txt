@@ -1,0 +1,35 @@
+CHANTIER BELÉM — APPLICATION AUTONOME (sans Claude)
+=====================================================
+
+Contenu
+  site/                 les fichiers du site, à publier tels quels (GitHub Pages)
+    index.html          l'application chantier (FR/PT)
+    finances.html       vos finances (accessible au seul administrateur)
+    shim.js             connexion et accès aux données
+    config.js           adresse et clé publique Supabase (à remplir, ou Claude le fait)
+  base-de-donnees.sql   script à coller UNE FOIS dans Supabase (tables, règles d'accès, données de départ)
+                        NE PAS publier ce fichier : il contient vos prix de référence.
+
+1. SUPABASE (base de données + comptes)
+  a. supabase.com → Continue with GitHub → New project « chantier-belem », région Europe.
+  b. SQL Editor → New query → collez TOUT base-de-donnees.sql → Run.
+     L'administrateur est bpelouin@icloud.com (modifiable en haut du script avant Run).
+  c. Authentication → Sign In / Providers → Email : décochez « Confirm email » → Save.
+  d. Authentication → URL Configuration → Site URL : l'adresse du site (étape 2).
+  e. Project Settings → API : copiez « Project URL » et la clé « anon public » dans site/config.js.
+
+2. GITHUB PAGES (le site)
+  a. github.com → New repository « chantier-belem », Public → Create.
+  b. « uploading an existing file » → glissez le CONTENU du dossier site/ (y compris .nojekyll) → Commit.
+  c. Settings → Pages → Source : Deploy from a branch → main / (root) → Save.
+  d. Après 1 à 2 minutes : https://VOTRE-NOM.github.io/chantier-belem/
+
+3. PREMIÈRE CONNEXION
+  Ouvrez le site → « Créer un compte » avec bpelouin@icloud.com : vous êtes administrateur.
+  Envoyez l'adresse du site à chaque intervenant ; il crée son compte, clique « Demander l'accès »,
+  et vous le validez dans l'onglet Équipe (rôle + lots). Sans validation, il ne voit rien.
+
+Sécurité
+  Les droits sont vérifiés par la base (Row Level Security) : une entreprise ne voit que ses propres prix,
+  ne peut ni se valider elle-même, ni écrire au nom d'un autre, ni modifier un devis accepté.
+  La clé « anon public » peut figurer dans le site. Ne publiez jamais la clé « service_role / secret ».
