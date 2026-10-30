@@ -10,12 +10,12 @@ const TX = {
       toSignup:'Pas encore de compte ? Créer un compte',toLogin:'Déjà un compte ? Se connecter',forgot:'Mot de passe oublié',
       sent:'Un e-mail de réinitialisation a été envoyé.',err:'Connexion impossible : vérifiez l\'e-mail et le mot de passe.',errSignup:'Inscription impossible : ',
       created:'Compte créé. Connectez-vous.',logout:'Se déconnecter',cfg:'Application non configurée : renseignez config.js (adresse et clé Supabase).',
-      newPass:'Nouveau mot de passe',setPass:'Enregistrer le mot de passe',min:'6 caractères minimum'},
+      newPass:'Nouveau mot de passe',setPass:'Enregistrer le mot de passe',min:'6 caractères minimum',chg:'Mot de passe',confirm:'Confirmer le mot de passe',mismatch:'Les deux mots de passe ne sont pas identiques.',done:'Mot de passe modifié.',cancel:'Annuler',errReset:'Envoi impossible : '},
   pt:{title:'Obra Belém',login:'Entrar',signup:'Criar conta',email:'E-mail',password:'Palavra-passe',name:'Nome',
       toSignup:'Ainda não tem conta? Criar conta',toLogin:'Já tem conta? Entrar',forgot:'Esqueci a palavra-passe',
       sent:'Foi enviado um e-mail de reposição.',err:'Não foi possível entrar: verifique o e-mail e a palavra-passe.',errSignup:'Não foi possível criar a conta: ',
       created:'Conta criada. Entre.',logout:'Sair',cfg:'Aplicação não configurada: preencha config.js (endereço e chave Supabase).',
-      newPass:'Nova palavra-passe',setPass:'Guardar a palavra-passe',min:'6 caracteres no mínimo'}
+      newPass:'Nova palavra-passe',setPass:'Guardar a palavra-passe',min:'6 caracteres no mínimo',chg:'Palavra-passe',confirm:'Confirmar a palavra-passe',mismatch:'As duas palavras-passe não são iguais.',done:'Palavra-passe alterada.',cancel:'Cancelar',errReset:'Envio impossível: '}
 }[L];
 
 let sb = null, session = null, me = null, adminId = null;
@@ -32,7 +32,8 @@ const css = `.bl-ov{position:fixed;inset:0;z-index:100;display:flex;align-items:
 .bl-card .lnk{background:none;color:#1f5aa6;padding:0;font-weight:500;text-align:left}
 .bl-card .msg{font-size:14px;color:#b3261e;min-height:1em}
 .bl-card .ok{color:#2e7d4f}
-.bl-out{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));z-index:50;font:600 12px system-ui,sans-serif;padding:5px 10px;border-radius:6px;border:1px solid #8c969d;background:#20262bcc;color:#fff;cursor:pointer}`;
+.bl-bar{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));z-index:50;display:flex;gap:6px}
+.bl-out{font:600 12px system-ui,sans-serif;padding:5px 10px;border-radius:6px;border:1px solid #8c969d;background:#20262bcc;color:#fff;cursor:pointer}`;
 function addCss(){ const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
 function overlay(html){ let o = document.querySelector('.bl-ov'); if (!o) { o = document.createElement('div'); o.className = 'bl-ov'; document.body.appendChild(o); } o.innerHTML = `<div class="bl-card">${html}</div>`; return o; }
 function authScreen(){
@@ -52,7 +53,7 @@ function authScreen(){
       o.querySelector('.msg').textContent = msg || '';
       o.querySelector('#bl-sw').onclick = () => { mode = mode === 'login' ? 'signup' : 'login'; draw(); };
       const fg = o.querySelector('#bl-fg');
-      if (fg) fg.onclick = async () => { const em = o.querySelector('[name=email]').value.trim(); if (!em) { o.querySelector('[name=email]').focus(); return; } await sb.auth.resetPasswordForEmail(em, {redirectTo:location.href.split('#')[0]}); draw(TX.sent, true); };
+      if (fg) fg.onclick = async () => { const em = o.querySelector('[name=email]').value.trim(); if (!em) { o.querySelector('[name=email]').focus(); return; } const rr = await sb.auth.resetPasswordForEmail(em, {redirectTo:location.href.split('#')[0].split('?')[0]}); if (rr.error) { draw(TX.errReset + rr.error.message); return; } draw(TX.sent, true); };
       o.querySelector('#bl-f').onsubmit = async e => {
         e.preventDefault(); const f = e.target.elements;
         const email = f.email.value.trim(), password = f.password.value;
@@ -71,12 +72,24 @@ function authScreen(){
     draw();
   });
 }
-function recoveryScreen(){
+function passwordScreen(canCancel){
   return new Promise(resolve => {
-    const o = overlay(`<h1>${TX.newPass}</h1><form id="bl-r" style="display:flex;flex-direction:column;gap:12px"><label>${TX.newPass}<input name="p" type="password" minlength="6" required autocomplete="new-password"></label><button type="submit">${TX.setPass}</button></form><div class="msg" role="status">${TX.min}</div>`);
-    o.querySelector('#bl-r').onsubmit = async e => { e.preventDefault(); const r = await sb.auth.updateUser({password:e.target.elements.p.value}); if (r.error) { o.querySelector('.msg').textContent = r.error.message; return; } o.remove(); resolve(); };
+    const o = overlay(`<h1>${TX.newPass}</h1><form id="bl-r" style="display:flex;flex-direction:column;gap:12px"><label>${TX.newPass}<input name="p" type="password" minlength="6" required autocomplete="new-password"></label><label>${TX.confirm}<input name="p2" type="password" minlength="6" required autocomplete="new-password"></label><button type="submit">${TX.setPass}</button>${canCancel ? `<button class="lnk" type="button" id="bl-c">${TX.cancel}</button>` : ''}</form><div class="msg" role="status">${TX.min}</div>`);
+    const msg = o.querySelector('.msg');
+    if (canCancel) o.querySelector('#bl-c').onclick = () => { o.remove(); resolve(false); };
+    o.querySelector('#bl-r').onsubmit = async e => {
+      e.preventDefault(); const f = e.target.elements;
+      if (f.p.value.length < 6) { msg.textContent = TX.min; return; }
+      if (f.p.value !== f.p2.value) { msg.textContent = TX.mismatch; return; }
+      const r = await sb.auth.updateUser({password:f.p.value});
+      if (r.error) { msg.textContent = r.error.message; return; }
+      msg.className = 'msg ok'; msg.textContent = TX.done;
+      setTimeout(() => { o.remove(); resolve(true); }, 900);
+    };
+    o.querySelector('input').focus();
   });
 }
+const recoveryScreen = () => passwordScreen(false);
 async function ensureSession(){
   addCss();
   if (!CFG.url || !CFG.anonKey || !window.supabase) { overlay(`<h1>${TX.title}</h1><p>${TX.cfg}</p>`); throw new Error('config'); }
@@ -87,8 +100,13 @@ async function ensureSession(){
   await new Promise(res => setTimeout(res, 50));
   if (recovering || /type=recovery/.test(location.hash)) await recoveryScreen();
   if (!session) await authScreen();
+  const bar = document.createElement('div'); bar.className = 'bl-bar';
+  const pw = document.createElement('button'); pw.className = 'bl-out'; pw.type = 'button'; pw.textContent = TX.chg;
+  pw.onclick = () => passwordScreen(true);
   const out = document.createElement('button'); out.className = 'bl-out'; out.type = 'button'; out.textContent = TX.logout;
-  out.onclick = () => sb.auth.signOut(); document.body.appendChild(out);
+  out.onclick = () => sb.auth.signOut();
+  bar.append(pw, out); document.body.appendChild(bar);
+  if (/type=recovery/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
   await loadMe();
 }
 async function loadMe(){
