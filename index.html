@@ -271,6 +271,7 @@ const T = {
   rfiType:'Type',rt_rfi:'Question (RFI)',rt_visa:'Plan à viser',question:'Question / document',addressedTo:'Adressé à',answerBy:'Réponse attendue le',answer:'Réponse',indice:'Indice',respond:'Répondre',
   pss:'PSS validé le',act:'Comunicação prévia (ACT) le',ovp:'Occupation de voirie valable jusqu\'au',ovpAlert:'Occupation de voirie expire bientôt',vatRate:'Taux de TVA (%)',retPct:'Retenue de garantie (%)',
   address:'Adresse',client:'Maître d\'ouvrage',architect:'Architecte',tsExt:'TS validés (+ j)',weatherExt:'Intempéries visées (+ j)',
+  multiHint:'Vous pouvez sélectionner plusieurs fichiers d\'un coup (Ctrl+A dans le dossier) : chacun devient un document portant son nom. PDF ou image, 20 Mo maximum par fichier, aucun prix.',files:'Fichiers',optional:'facultatif',
   seeFinance:'Vos chiffres confidentiels (budget, prix de référence, paiements, pénalités) sont dans la page Finances, accessible à vous seul.',
  },
  pt:{
@@ -338,6 +339,7 @@ const T = {
   rfiType:'Tipo',rt_rfi:'Pedido de informação',rt_visa:'Desenho para aprovação',question:'Pergunta / documento',addressedTo:'Dirigido a',answerBy:'Resposta até',answer:'Resposta',indice:'Revisão',respond:'Responder',
   pss:'PSS validado em',act:'Comunicação prévia (ACT) em',ovp:'Ocupação da via pública válida até',ovpAlert:'Ocupação da via pública expira em breve',vatRate:'Taxa de IVA (%)',retPct:'Retenção de garantia (%)',
   address:'Morada',client:'Dono de obra',architect:'Arquiteto',tsExt:'Trabalhos a mais aprovados (+ d)',weatherExt:'Intempéries visadas (+ d)',
+  multiHint:'Pode selecionar vários ficheiros de uma vez (Ctrl+A na pasta): cada um torna-se um documento com o seu nome. PDF ou imagem, 20 MB no máximo por ficheiro, sem preços.',files:'Ficheiros',optional:'facultativo',
   seeFinance:'Os números confidenciais (orçamento, preços de referência, pagamentos, multas) estão na página Finanças, acessível só a si.',
  }
 };
@@ -771,7 +773,7 @@ function vRequests(){
 function vDocs(){
   const cats = ['plans','admin','securite','vistoria','photos','autres'];
   const all = pubAll('doc');
-  const by = c => all.filter(d => (cats.includes(d.category) ? d.category : 'autres') === c).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const by = c => all.filter(d => (cats.includes(d.category) ? d.category : 'autres') === c).sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(a.title || '').localeCompare(String(b.title || ''), undefined, {numeric:true}));
   const sections = cats.filter(c => by(c).length).map(c => `<section class="panel"><h3>${esc(t('c_' + c))}</h3>${table([[t('title')],[t('author')],[t('date')],['']], by(c).map(d => `<tr><td><b>${fileLink(d.fileId, d.title) || esc(d.title)}</b>${d.phase ? ' ' + pillTxt(t('ph_' + d.phase)) : ''}${d.place ? `<div class="small muted">${esc(d.place)}</div>` : ''}${d.note ? `<div class="small muted">${esc(d.note)}</div>` : ''}</td><td class="small muted">${esc(authorLine(d._k))}</td><td>${fmtDate(d.date)}</td><td><div class="actions">${canPost() && d._k === myKey() ? btn('editDoc', t('edit'), 'sm', `data-id="${esc(d.id)}"`) : ''}${isAdmin() || (canPost() && d._k === myKey()) ? delBtn(`pub/${d._k}/items`, d.id) : ''}</div></td></tr>`).join(''))}</section>`).join('');
   return head('docs', newBtn('newDoc')) + banner() + (sections || `<section class="panel">${empty('emptyD','emptyDh')}</section>`);
 }
@@ -1034,16 +1036,28 @@ function formAnswer(k, id){
 }
 function formDoc(d){
   const isNew = !d; d = d || {date:today(), category:'plans'};
-  openForm(t('docs'), t('fileHint'), [
-    {k:'title', label:t('title'), req:true, wide:true},
+  openForm(t('docs'), isNew ? t('multiHint') : t('fileHint'), [
+    {k:'title', label:t('title') + (isNew ? ' (' + t('optional') + ')' : ''), req:!isNew, wide:true},
     {k:'category', label:t('category'), type:'select', options:['plans','admin','securite','vistoria','photos','autres'].map(c => ({v:c, l:t('c_' + c)}))}, {k:'date', label:t('date'), type:'date'},
     {k:'phase', label:t('phase'), type:'select', options:[{v:'', l:'—'}, ...['avant','pendant','apres'].map(p => ({v:p, l:t('ph_' + p)}))]}, {k:'place', label:t('place')},
-    {k:'file', label:t('file'), type:'file', wide:true}, {k:'note', label:t('note'), type:'textarea', wide:true}
+    {k:'file', label:isNew ? t('files') : t('file'), type:isNew ? 'files' : 'file', wide:true}, {k:'note', label:t('note'), type:'textarea', wide:true}
   ], d, async v => {
-    const data = {kind:'doc', title:v.title, category:v.category, date:v.date, phase:v.phase, place:v.place, note:v.note};
+    const base = {kind:'doc', category:v.category, date:v.date, phase:v.phase, place:v.place, note:v.note};
+    if (isNew) {
+      if (!v.file.length) throw {upload:true};
+      const nameOf = f => f.name.replace(/\.[^.]+$/, '').replace(/[-_]+$/, '').trim();
+      let i = 0;
+      for (const f of v.file) {
+        i++; if (v.file.length > 1) toast(t('uploading') + ' ' + i + ' / ' + v.file.length);
+        const fileId = await uploadOne(f);
+        const title = v.file.length === 1 && v.title ? v.title : (v.title ? v.title + ' — ' : '') + nameOf(f);
+        await putItem(myPub(), null, {...base, title, fileId, fileName:f.name}, true);
+      }
+      return;
+    }
+    const data = {...base, title:v.title};
     if (v.file[0]) { data.fileId = await uploadOne(v.file[0]); data.fileName = v.file[0].name; }
-    else if (isNew) throw {upload:true};
-    await putItem(myPub(), d.id, data, isNew);
+    await putItem(myPub(), d.id, data, false);
   });
 }
 function formTask(tk){
